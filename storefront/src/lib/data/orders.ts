@@ -1,31 +1,28 @@
 "use server"
 
 import { cache } from "react"
-import { sdk } from "@lib/config"
-import medusaError from "@lib/util/medusa-error"
-import { enrichLineItems } from "@lib/util/enrich-line-items"
-import { getAuthHeaders } from "@lib/data/cookies"
 import { HttpTypes } from "@medusajs/types"
+import store from "@lib/mock/store.json"
+import { getLocalOrders } from "@lib/data/cookies"
+
+type LocalOrder = HttpTypes.StoreOrder
 
 export const retrieveOrder = cache(async function (id: unknown) {
   if (typeof id !== "string") {
     throw new Error("Invalid order id")
   }
 
-  const order = await sdk.client
-    .fetch<HttpTypes.StoreOrderResponse>(`/store/orders/${id}`, {
-      query: { fields: "*payment_collections.payments" },
-      next: { tags: ["orders"] },
-      headers: { ...(await getAuthHeaders()) },
-    })
-    .then(({ order }) => order)
-    .catch((err) => medusaError(err))
+  const localOrdersJson = await getLocalOrders()
+  const localOrders: LocalOrder[] = localOrdersJson
+    ? (JSON.parse(localOrdersJson) as LocalOrder[])
+    : []
 
-  if (order.items?.length && order.region_id) {
-    order.items = await enrichLineItems(order.items, order.region_id)
-  }
+  const all = [
+    ...(store.orders as unknown as LocalOrder[]),
+    ...localOrders,
+  ]
 
-  return order
+  return all.find((o) => o.id === id) ?? null
 })
 
 export const listOrders = async function (
@@ -43,11 +40,12 @@ export const listOrders = async function (
     throw new Error("Invalid input data")
   }
 
-  return sdk.client
-    .fetch<HttpTypes.StoreOrderListResponse>(`/store/orders`, {
-      query: { limit, offset, order: "-created_at" },
-      next: { tags: ["orders"] },
-      headers: { ...(await getAuthHeaders()) },
-    })
-    .catch((err) => medusaError(err))
+  const localOrdersJson = await getLocalOrders()
+  const localOrders: LocalOrder[] = localOrdersJson
+    ? (JSON.parse(localOrdersJson) as LocalOrder[])
+    : []
+
+  const all = [...(store.orders as unknown as LocalOrder[]), ...localOrders]
+  const orders = all.slice(offset, offset + limit)
+  return { orders, count: all.length } as HttpTypes.StoreOrderListResponse
 }

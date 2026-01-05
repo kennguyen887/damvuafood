@@ -11,7 +11,7 @@ import { UiTagList, UiTagListDivider } from "@/components/ui/TagList"
 import { Icon } from "@/components/Icon"
 import { LocalizedLink } from "@/components/LocalizedLink"
 import { getCustomer } from "@lib/data/customer"
-import { redirect } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
 export const metadata: Metadata = {
   title: "Account - Order",
@@ -98,6 +98,9 @@ export default async function AccountOrderPage({
 
   const { orderId } = await params
   const order = await retrieveOrder(orderId)
+  if (!order) {
+    notFound()
+  }
 
   return (
     <>

@@ -1,6 +1,6 @@
 const c = require("ansi-colors")
 
-const commonRequiredEnvs = [
+const requiredEnvs = [
   {
     key: "NEXT_PUBLIC_BASE_URL",
     description:
@@ -13,34 +13,7 @@ const commonRequiredEnvs = [
   },
 ]
 
-const medusaRequiredEnvs = [
-  {
-    key: "NEXT_PUBLIC_MEDUSA_BACKEND_URL",
-    description:
-      "Your Medusa backend, should be updated to where you are hosting your server. Remember to update CORS settings for your server. See - https://docs.medusajs.com/usage/configurations#admin_cors-and-store_cors.",
-  },
-  {
-    key: "NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY",
-    description:
-      "Your publishable key that can be attached to sales channels. See - https://docs.medusajs.com/development/publishable-api-keys.",
-  },
-  {
-    key: "NEXT_PUBLIC_STRIPE_KEY",
-    description:
-      "Your Stripe public key. See - https://docs.medusajs.com/add-plugins/stripe.",
-  },
-]
-
 function checkEnvVariables() {
-  const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE || "json"
-
-  if (dataSource === "json") {
-    return
-  }
-
-  const requiredEnvs =
-    commonRequiredEnvs.concat(medusaRequiredEnvs)
-
   const missingEnvs = requiredEnvs.filter(function (env) {
     return !process.env[env.key]
   })

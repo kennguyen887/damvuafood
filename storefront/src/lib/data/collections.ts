@@ -1,17 +1,15 @@
-import { sdk } from "@lib/config"
 import { getProductsList } from "@lib/data/products"
 import { HttpTypes } from "@medusajs/types"
+import store from "@lib/mock/store.json"
 
 export const retrieveCollection = async function (id: string) {
-  return sdk.client
-    .fetch<{ collection: HttpTypes.StoreCollection }>(
-      `/store/collections/${id}`,
-      {
-        next: { tags: ["collections"] },
-        cache: "force-cache",
-      }
-    )
-    .then(({ collection }) => collection)
+  const collection = (
+    store.collections as unknown as HttpTypes.StoreCollection[]
+  ).find((c) => c.id === id)
+  if (!collection) {
+    throw new Error(`Collection not found: ${id}`)
+  }
+  return collection
 }
 
 export const getCollectionsList = async function (
@@ -19,33 +17,39 @@ export const getCollectionsList = async function (
   limit: number = 100,
   fields?: (keyof HttpTypes.StoreCollection)[]
 ): Promise<{ collections: HttpTypes.StoreCollection[]; count: number }> {
-  return sdk.client
-    .fetch<{
-      collections: HttpTypes.StoreCollection[]
-      count: number
-    }>("/store/collections", {
-      query: { limit, offset, fields: fields ? fields.join(",") : undefined },
-      next: { tags: ["collections"] },
-      cache: "force-cache",
-    })
-    .then(({ collections }) => ({ collections, count: collections.length }))
+  const all = store.collections as unknown as HttpTypes.StoreCollection[]
+  const sliced = all.slice(offset, offset + limit)
+  const collections =
+    fields && fields.length
+      ? sliced.map((c) => {
+          const picked: Partial<HttpTypes.StoreCollection> = {}
+          fields.forEach((f) => {
+            picked[f] = c[f] as never
+          })
+          return picked as HttpTypes.StoreCollection
+        })
+      : sliced
+
+  return { collections, count: all.length }
 }
 
 export const getCollectionByHandle = async function (
   handle: string,
   fields?: (keyof HttpTypes.StoreCollection)[]
 ): Promise<HttpTypes.StoreCollection> {
-  return sdk.client
-    .fetch<HttpTypes.StoreCollectionListResponse>(`/store/collections`, {
-      query: {
-        handle,
-        fields: fields ? fields.join(",") : undefined,
-        limit: 1,
-      },
-      next: { tags: ["collections"] },
-      cache: "force-cache",
+  const all = store.collections as unknown as HttpTypes.StoreCollection[]
+  const match = all.find((c) => c.handle === handle)
+  if (!match) {
+    throw new Error(`Collection not found: ${handle}`)
+  }
+  if (fields && fields.length) {
+    const picked: Partial<HttpTypes.StoreCollection> = {}
+    fields.forEach((f) => {
+      picked[f] = match[f] as never
     })
-    .then(({ collections }) => collections[0])
+    return picked as HttpTypes.StoreCollection
+  }
+  return match
 }
 
 export const getCollectionsWithProducts = async (

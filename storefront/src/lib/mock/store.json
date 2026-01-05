@@ -4,7 +4,7 @@
       "id": "region_vn",
       "name": "Vietnam",
       "currency_code": "vnd",
-      "countries": [{ "iso_2": "vn", "display_name": "Vietnam" }]
+      "countries": [{ "id": "vn", "iso_2": "vn", "display_name": "Vietnam" }]
     }
   ],
   "product_types": [

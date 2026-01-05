@@ -1,17 +1,13 @@
-import { sdk } from "@lib/config"
 import { HttpTypes } from "@medusajs/types"
 import { getRegion } from "@lib/data/regions"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import { sortProducts } from "@lib/util/sort-products"
+import store from "@lib/mock/store.json"
 
 export const listProductHandles = async function () {
-  return sdk.client
-    .fetch<{ products: { handle: string }[] }>(`/store/products`, {
-      query: { limit: 1000, fields: "handle" },
-      next: { tags: ["products"] },
-      cache: "force-cache",
-    })
-    .then(({ products }) => products.map((p) => p.handle).filter(Boolean))
+  return (store.products as unknown as HttpTypes.StoreProduct[])
+    .map((p) => p.handle)
+    .filter(Boolean) as string[]
 }
 
 export const getProductsById = async function ({
@@ -21,51 +17,31 @@ export const getProductsById = async function ({
   ids: string[]
   regionId: string
 }) {
-  return sdk.client
-    .fetch<{ products: HttpTypes.StoreProduct[] }>(`/store/products`, {
-      query: {
-        id: ids,
-        region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity",
-      },
-      next: { tags: ["products"] },
-      cache: "force-cache",
-    })
-    .then(({ products }) => products)
+  void regionId
+  const all = store.products as unknown as HttpTypes.StoreProduct[]
+  return all.filter((p) => ids.includes(p.id as string))
 }
 
 export const getProductByHandle = async function (
   handle: string,
   regionId: string
 ) {
-  return sdk.client
-    .fetch<{ products: HttpTypes.StoreProduct[] }>(`/store/products`, {
-      query: {
-        handle,
-        region_id: regionId,
-        fields: "*variants.calculated_price,+variants.inventory_quantity",
-      },
-      next: { tags: ["products"] },
-    })
-    .then(({ products }) => products[0])
+  void regionId
+  const all = store.products as unknown as HttpTypes.StoreProduct[]
+  return all.find((p) => p.handle === handle) ?? null
 }
 
 export const getProductFashionDataByHandle = async function (handle: string) {
-  return sdk.client.fetch<{
+  const materials =
+    (store.fashion as Record<string, { materials: unknown[] }>)[handle]
+      ?.materials ?? []
+  return { materials } as {
     materials: {
       id: string
       name: string
-      colors: {
-        id: string
-        name: string
-        hex_code: string
-      }[]
+      colors: { id: string; name: string; hex_code: string }[]
     }[]
-  }>(`/store/custom/fashion/${handle}`, {
-    method: "GET",
-    next: { tags: ["products"] },
-    cache: "force-cache",
-  })
+  }
 }
 
 export const getProductsList = async function ({
@@ -92,33 +68,33 @@ export const getProductsList = async function ({
       nextPage: null,
     }
   }
-  return sdk.client
-    .fetch<{ products: HttpTypes.StoreProduct[]; count: number }>(
-      `/store/products`,
-      {
-        query: {
-          limit,
-          offset,
-          region_id: region.id,
-          fields: "*variants.calculated_price",
-          ...queryParams,
-        },
-        next: { tags: ["products"] },
-        cache: "force-cache",
-      }
-    )
-    .then(({ products, count }) => {
-      const nextPage = count > offset + limit ? page + 1 : null
+  let filtered = store.products as unknown as HttpTypes.StoreProduct[]
 
-      return {
-        response: {
-          products,
-          count,
-        },
-        nextPage: nextPage,
-        queryParams,
-      }
-    })
+  const collectionIds = queryParams?.collection_id as unknown
+  if (collectionIds) {
+    const ids = Array.isArray(collectionIds) ? collectionIds : [collectionIds]
+    filtered = filtered.filter((p) =>
+      ids.includes((p.collection_id ?? "") as string)
+    )
+  }
+
+  const productIds = queryParams?.id as unknown
+  if (productIds) {
+    const ids = Array.isArray(productIds) ? productIds : [productIds]
+    filtered = filtered.filter((p) => ids.includes(p.id as string))
+  }
+
+  const typeIds = queryParams?.type_id as unknown
+  if (typeIds) {
+    const ids = Array.isArray(typeIds) ? typeIds : [typeIds]
+    filtered = filtered.filter((p) => ids.includes((p.type?.id ?? "") as string))
+  }
+
+  const count = filtered.length
+  const products = filtered.slice(offset, offset + limit)
+  const nextPage = count > offset + limit ? page + 1 : null
+
+  return { response: { products, count }, nextPage, queryParams }
 }
 
 /**

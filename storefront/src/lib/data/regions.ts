@@ -1,27 +1,18 @@
-import { sdk } from "@lib/config"
-import medusaError from "@lib/util/medusa-error"
 import { HttpTypes } from "@medusajs/types"
+import store from "@lib/mock/store.json"
 
 export const listRegions = async function () {
-  return sdk.client
-    .fetch<{ regions: HttpTypes.StoreRegion[] }>(`/store/regions`, {
-      method: "GET",
-      next: { tags: ["regions"] },
-      cache: "force-cache",
-    })
-    .then(({ regions }) => regions)
-    .catch(medusaError)
+  return store.regions as unknown as HttpTypes.StoreRegion[]
 }
 
 export const retrieveRegion = async function (id: string) {
-  return sdk.client
-    .fetch<{ region: HttpTypes.StoreRegion }>(`/store/regions/${id}`, {
-      method: "GET",
-      next: { tags: [`regions`] },
-      cache: "force-cache",
-    })
-    .then(({ region }) => region)
-    .catch(medusaError)
+  const region = (store.regions as unknown as HttpTypes.StoreRegion[]).find(
+    (r) => r.id === id
+  )
+  if (!region) {
+    throw new Error(`Region not found: ${id}`)
+  }
+  return region
 }
 
 const regionMap = new Map<string, HttpTypes.StoreRegion>()

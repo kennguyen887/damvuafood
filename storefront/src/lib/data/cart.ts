@@ -6,23 +6,19 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import { PaymentMethod } from "@stripe/stripe-js"
 
-import { sdk } from "@lib/config"
-import medusaError from "@lib/util/medusa-error"
-import { enrichLineItems } from "@lib/util/enrich-line-items"
+import store from "@lib/mock/store.json"
+import { getRegion } from "@lib/data/regions"
 import {
   getCartId,
-  getAuthHeaders,
-  setCartId,
-  removeCartId,
   getLocalCart,
-  setLocalCart,
+  getLocalOrders,
+  removeCartId,
   removeLocalCart,
+  setCartId,
+  setLocalCart,
+  setLocalOrders,
 } from "@lib/data/cookies"
-import { getRegion } from "@lib/data/regions"
 import { addressesFormSchema } from "hooks/cart"
-import store from "@lib/mock/store.json"
-
-const DATA_SOURCE = process.env.NEXT_PUBLIC_DATA_SOURCE ?? "json"
 
 type LocalCartItem = {
   id: string
@@ -34,6 +30,19 @@ type LocalCartItem = {
 type LocalCartState = {
   id: string
   region_id?: string
+  email?: string
+  shipping_address?: unknown
+  billing_address?: unknown
+  shipping_methods?: { shipping_option_id: string }[]
+  payment_collection?: {
+    id: string
+    payment_sessions: {
+      id: string
+      provider_id: string
+      status: "pending" | "requires_more" | "authorized" | "captured" | "canceled"
+      data?: Record<string, unknown>
+    }[]
+  }
   promotions?: { code?: string }[]
   items: LocalCartItem[]
 }
@@ -68,6 +77,14 @@ function variantUnitAmount(variant: unknown) {
   return v?.calculated_price?.calculated_amount ?? 0
 }
 
+async function getExistingLocalCart() {
+  const cart = safeJsonParse<LocalCartState>(await getLocalCart())
+  if (!cart) {
+    throw new Error("No existing cart found")
+  }
+  return cart
+}
+
 async function getOrCreateLocalCart(countryCode: string) {
   const existing = safeJsonParse<LocalCartState>(await getLocalCart())
   if (existing?.id && Array.isArray(existing.items)) return existing
@@ -76,6 +93,11 @@ async function getOrCreateLocalCart(countryCode: string) {
   const cart: LocalCartState = {
     id: createId("cart"),
     region_id: region?.id,
+    email: undefined,
+    shipping_address: undefined,
+    billing_address: undefined,
+    shipping_methods: [],
+    payment_collection: undefined,
     promotions: [],
     items: [],
   }
@@ -91,7 +113,18 @@ async function saveLocalCart(cart: LocalCartState) {
 }
 
 function toStoreCart(cart: LocalCartState): HttpTypes.StoreCart {
-  const currency_code = store.regions[0]?.currency_code ?? "vnd"
+  const region = (store.regions as { id: string }[]).find(
+    (r) => r.id === cart.region_id
+  )
+
+  const currency_code = (() => {
+    const maybe = region as unknown as { currency_code?: unknown } | undefined
+    return (
+      (typeof maybe?.currency_code === "string" ? maybe.currency_code : null) ??
+      store.regions[0]?.currency_code ??
+      "vnd"
+    )
+  })()
 
   const items = cart.items
     .map((i) => {
@@ -122,61 +155,43 @@ function toStoreCart(cart: LocalCartState): HttpTypes.StoreCart {
   const tax_total = 0
   const discount_total = 0
   const gift_card_total = 0
-  const total = subtotal + shipping_total + tax_total - discount_total - gift_card_total
+  const total =
+    subtotal + shipping_total + tax_total - discount_total - gift_card_total
 
   return {
     id: cart.id,
     region_id: cart.region_id,
+    region: region as unknown as HttpTypes.StoreRegion,
     currency_code,
     items,
     promotions: cart.promotions ?? [],
+    email: cart.email,
+    shipping_address:
+      cart.shipping_address as unknown as HttpTypes.StoreCart["shipping_address"],
+    billing_address:
+      cart.billing_address as unknown as HttpTypes.StoreCart["billing_address"],
+    shipping_methods:
+      (cart.shipping_methods ?? []) as unknown as HttpTypes.StoreCart["shipping_methods"],
+    payment_collection:
+      cart.payment_collection as unknown as HttpTypes.StoreCart["payment_collection"],
     subtotal,
     total,
     tax_total,
     shipping_total,
     discount_total,
     gift_card_total,
-    shipping_methods: [],
   } as unknown as HttpTypes.StoreCart
 }
 
 export async function retrieveCart() {
-  if (DATA_SOURCE === "json") {
-    const cart = safeJsonParse<LocalCartState>(await getLocalCart())
-    if (!cart) return null
-    return toStoreCart(cart)
-  }
-
-  const cartId = await getCartId()
-
-  if (!cartId) {
-    return null
-  }
-  const cart = await sdk.client
-    .fetch<HttpTypes.StoreCartResponse>(`/store/carts/${cartId}`, {
-      next: { tags: ["cart"] },
-      headers: { ...(await getAuthHeaders()) },
-      cache: "no-store",
-    })
-    .then(({ cart }) => cart)
-    .catch(() => {
-      return null
-    })
-
-  if (cart?.items && cart.items.length && cart.region_id) {
-    cart.items = await enrichLineItems(cart.items, cart.region_id)
-  }
-
-  return cart
+  const cart = safeJsonParse<LocalCartState>(await getLocalCart())
+  if (!cart) return null
+  return toStoreCart(cart)
 }
 
 export async function getCartQuantity() {
   const cart = await retrieveCart()
-
-  if (!cart || !cart.items || !cart.items.length) {
-    return 0
-  }
-
+  if (!cart?.items?.length) return 0
   return cart.items.reduce((acc, item) => acc + item.quantity, 0)
 }
 
@@ -185,58 +200,8 @@ export async function getOrSetCart(input: unknown) {
     throw new Error("Invalid input when retrieving cart")
   }
 
-  const countryCode = input
-
-  if (DATA_SOURCE === "json") {
-    const cart = await getOrCreateLocalCart(countryCode)
-    return toStoreCart(cart)
-  }
-
-  let cart = await retrieveCart()
-  const region = await getRegion(countryCode)
-
-  if (!region) {
-    throw new Error(`Region not found for country code: ${countryCode}`)
-  }
-
-  if (!cart) {
-    const cartResp = await sdk.store.cart.create(
-      { region_id: region.id },
-      {},
-      await getAuthHeaders()
-    )
-    cart = cartResp.cart
-
-    await setCartId(cart.id)
-    revalidateTag("cart")
-  }
-
-  if (cart && cart?.region_id !== region.id) {
-    await sdk.store.cart.update(
-      cart.id,
-      { region_id: region.id },
-      {},
-      await getAuthHeaders()
-    )
-    revalidateTag("cart")
-  }
-
-  return cart
-}
-
-async function updateCart(data: HttpTypes.StoreUpdateCart) {
-  const cartId = await getCartId()
-  if (!cartId) {
-    throw new Error("No existing cart found, please create one before updating")
-  }
-
-  return sdk.store.cart
-    .update(cartId, data, {}, await getAuthHeaders())
-    .then(({ cart }) => {
-      revalidateTag("cart")
-      return cart
-    })
-    .catch(medusaError)
+  const cart = await getOrCreateLocalCart(input)
+  return toStoreCart(cart)
 }
 
 export async function addToCart({
@@ -264,59 +229,36 @@ export async function addToCart({
     throw new Error("Missing country code when adding to cart")
   }
 
-  if (DATA_SOURCE === "json") {
-    const found = findProductAndVariant(variantId)
-    if (!found) {
-      throw new Error("Variant not found")
-    }
-
-    const cart = await getOrCreateLocalCart(countryCode)
-
-    const existing = cart.items.find((i) => i.variant_id === variantId)
-    const max =
-      found.variant.manage_inventory === false || found.variant.allow_backorder
-        ? Number.MAX_SAFE_INTEGER
-        : found.variant.inventory_quantity ?? 0
-
-    const nextQty = (existing?.quantity ?? 0) + quantity
-    if (nextQty > max) {
-      throw new Error("Not enough inventory")
-    }
-
-    if (existing) {
-      existing.quantity = nextQty
-    } else {
-      cart.items.push({
-        id: createId("li"),
-        variant_id: variantId,
-        quantity,
-        created_at: new Date().toISOString(),
-      })
-    }
-
-    await saveLocalCart(cart)
-    return
+  const found = findProductAndVariant(variantId)
+  if (!found) {
+    throw new Error("Variant not found")
   }
 
-  const cart = await getOrSetCart(countryCode)
-  if (!cart) {
-    throw new Error("Error retrieving or creating cart")
+  const cart = await getOrCreateLocalCart(countryCode)
+
+  const existing = cart.items.find((i) => i.variant_id === variantId)
+  const max =
+    found.variant.manage_inventory === false || found.variant.allow_backorder
+      ? Number.MAX_SAFE_INTEGER
+      : found.variant.inventory_quantity ?? 0
+
+  const nextQty = (existing?.quantity ?? 0) + quantity
+  if (nextQty > max) {
+    throw new Error("Not enough inventory")
   }
 
-  await sdk.store.cart
-    .createLineItem(
-      cart.id,
-      {
-        variant_id: variantId,
-        quantity,
-      },
-      {},
-      await getAuthHeaders()
-    )
-    .then(() => {
-      revalidateTag("cart")
+  if (existing) {
+    existing.quantity = nextQty
+  } else {
+    cart.items.push({
+      id: createId("li"),
+      variant_id: variantId,
+      quantity,
+      created_at: new Date().toISOString(),
     })
-    .catch(medusaError)
+  }
+
+  await saveLocalCart(cart)
 }
 
 export async function updateLineItem({
@@ -338,41 +280,24 @@ export async function updateLineItem({
     throw new Error("Missing quantity when updating line item")
   }
 
-  if (DATA_SOURCE === "json") {
-    const cart = safeJsonParse<LocalCartState>(await getLocalCart())
-    if (!cart) throw new Error("Missing cart when updating line item")
+  const cart = await getExistingLocalCart()
+  const item = cart.items.find((i) => i.id === lineId)
+  if (!item) throw new Error("Line item not found")
 
-    const item = cart.items.find((i) => i.id === lineId)
-    if (!item) throw new Error("Line item not found")
+  const found = findProductAndVariant(item.variant_id)
+  if (!found) throw new Error("Variant not found")
 
-    const found = findProductAndVariant(item.variant_id)
-    if (!found) throw new Error("Variant not found")
+  const max =
+    found.variant.manage_inventory === false || found.variant.allow_backorder
+      ? Number.MAX_SAFE_INTEGER
+      : found.variant.inventory_quantity ?? 0
 
-    const max =
-      found.variant.manage_inventory === false || found.variant.allow_backorder
-        ? Number.MAX_SAFE_INTEGER
-        : found.variant.inventory_quantity ?? 0
-
-    if (quantity > max) {
-      throw new Error("Not enough inventory")
-    }
-
-    item.quantity = quantity
-    await saveLocalCart(cart)
-    return
+  if (quantity > max) {
+    throw new Error("Not enough inventory")
   }
 
-  const cartId = await getCartId()
-  if (!cartId) {
-    throw new Error("Missing cart ID when updating line item")
-  }
-
-  await sdk.store.cart
-    .updateLineItem(cartId, lineId, { quantity }, {}, await getAuthHeaders())
-    .then(() => {
-      revalidateTag("cart")
-    })
-    .catch(medusaError)
+  item.quantity = quantity
+  await saveLocalCart(cart)
 }
 
 export async function deleteLineItem(lineId: unknown) {
@@ -380,26 +305,10 @@ export async function deleteLineItem(lineId: unknown) {
     throw new Error("Missing lineItem ID when deleting line item")
   }
 
-  if (DATA_SOURCE === "json") {
-    const cart = safeJsonParse<LocalCartState>(await getLocalCart())
-    if (!cart) return
-    cart.items = cart.items.filter((i) => i.id !== lineId)
-    await saveLocalCart(cart)
-    return
-  }
-
-  const cartId = await getCartId()
-  if (!cartId) {
-    throw new Error("Missing cart ID when deleting line item")
-  }
-
-  await sdk.store.cart
-    .deleteLineItem(cartId, lineId, await getAuthHeaders())
-    .then(() => {
-      revalidateTag("cart")
-    })
-    .catch(medusaError)
-  revalidateTag("cart")
+  const cart = safeJsonParse<LocalCartState>(await getLocalCart())
+  if (!cart) return
+  cart.items = cart.items.filter((i) => i.id !== lineId)
+  await saveLocalCart(cart)
 }
 
 export async function setShippingMethod({
@@ -417,90 +326,58 @@ export async function setShippingMethod({
     throw new Error("Missing shipping method ID when setting shipping method")
   }
 
-  return sdk.store.cart
-    .addShippingMethod(
-      cartId,
-      { option_id: shippingMethodId },
-      {},
-      await getAuthHeaders()
-    )
-    .then(() => {
-      revalidateTag("cart")
-    })
-    .catch(medusaError)
+  const cart = await getExistingLocalCart()
+  if (cart.id !== cartId) {
+    throw new Error("Cart mismatch")
+  }
+
+  cart.shipping_methods = [{ shipping_option_id: shippingMethodId }]
+  await saveLocalCart(cart)
 }
 
 export async function setPaymentMethod(
   session_id: string,
   token: string | null | undefined
 ) {
-  await sdk.client
-    .fetch("/store/custom/stripe/set-payment-method", {
-      method: "POST",
-      body: { session_id, token },
-    })
-    .then((resp) => {
-      revalidateTag("cart")
-      return resp
-    })
-    .catch(medusaError)
+  void session_id
+  void token
+  return
 }
 
 export async function getPaymentMethod(id: string) {
-  return await sdk.client
-    .fetch<PaymentMethod>(`/store/custom/stripe/get-payment-method/${id}`)
-    .then((resp: PaymentMethod) => {
-      return resp
-    })
-    .catch(medusaError)
+  void id
+  return null as PaymentMethod | null
 }
 
 export async function initiatePaymentSession(provider_id: unknown) {
-  const cart = await retrieveCart()
-
-  if (!cart) {
-    throw new Error("Can't initiate payment without cart")
-  }
+  const cart = await getExistingLocalCart()
 
   if (typeof provider_id !== "string") {
     throw new Error("Invalid payment provider")
   }
 
-  return sdk.store.payment
-    .initiatePaymentSession(
-      cart,
+  cart.payment_collection = {
+    id: createId("paycol"),
+    payment_sessions: [
       {
+        id: createId("paysess"),
         provider_id,
+        status: "pending",
+        data: {},
       },
-      {},
-      await getAuthHeaders()
-    )
-    .then((resp) => {
-      revalidateTag("cart")
-      return resp
-    })
-    .catch(medusaError)
+    ],
+  }
+
+  await saveLocalCart(cart)
+  return {
+    payment_collection: cart.payment_collection,
+  } as unknown as HttpTypes.StorePaymentCollectionResponse
 }
 
 export async function applyPromotions(codes: string[]) {
-  if (DATA_SOURCE === "json") {
-    const cart = safeJsonParse<LocalCartState>(await getLocalCart())
-    if (!cart) throw new Error("No existing cart found")
-    cart.promotions = codes.map((c) => ({ code: c }))
-    await saveLocalCart(cart)
-    return
-  }
-
-  const cartId = await getCartId()
-  if (!cartId) {
-    throw new Error("No existing cart found")
-  }
-
-  await updateCart({ promo_codes: codes })
-    .then(() => {
-      revalidateTag("cart")
-    })
-    .catch(medusaError)
+  const cart = await getExistingLocalCart()
+  cart.promotions = codes.map((c) => ({ code: c }))
+  await saveLocalCart(cart)
 }
 
 export async function setEmail({
@@ -510,24 +387,18 @@ export async function setEmail({
   email: string
   country_code: string
 }) {
-  try {
-    const cartId = await getCartId()
-    if (!cartId) {
-      throw new Error("No existing cart found when setting addresses")
-    }
-  } catch (e) {
-    return {
-      success: false,
-      error: e instanceof Error ? e.message : "Could not get your cart",
-    }
-  }
-
   const countryCode = z.string().min(2).safeParse(country_code)
   if (!countryCode.success) {
     return { success: false, error: "Invalid country code" }
   }
 
-  await updateCart({ email })
+  const cart = safeJsonParse<LocalCartState>(await getLocalCart())
+  if (!cart) {
+    return { success: false, error: "No existing cart found" }
+  }
+
+  cart.email = email
+  await saveLocalCart(cart)
 
   return { success: true, error: null }
 }
@@ -539,18 +410,18 @@ export async function setAddresses(
     if (!formData) {
       throw new Error("No form data found when setting addresses")
     }
-    const cartId = await getCartId()
-    if (!cartId) {
+    const cart = safeJsonParse<LocalCartState>(await getLocalCart())
+    if (!cart) {
       throw new Error("No existing cart found when setting addresses")
     }
 
-    await updateCart({
-      shipping_address: formData.shipping_address,
-      billing_address:
-        formData.same_as_billing === "on"
-          ? formData.shipping_address
-          : formData.billing_address,
-    })
+    cart.shipping_address = formData.shipping_address
+    cart.billing_address =
+      formData.same_as_billing === "on"
+        ? formData.shipping_address
+        : formData.billing_address
+
+    await saveLocalCart(cart)
     revalidateTag("shipping")
     return { success: true, error: null }
   } catch (e) {
@@ -562,39 +433,80 @@ export async function setAddresses(
 }
 
 export async function placeOrder() {
-  if (DATA_SOURCE === "json") {
-    await removeCartId()
-    await removeLocalCart()
-    revalidateTag("cart")
-    return null
+  const cart = await getExistingLocalCart()
+  const storeCart = toStoreCart(cart)
+
+  const localOrdersJson = await getLocalOrders()
+  const localOrders: unknown = localOrdersJson ? JSON.parse(localOrdersJson) : []
+
+  const existingDisplayIds = [
+    ...(store.orders as { display_id?: number }[]).map((o) => o.display_id),
+    ...(Array.isArray(localOrders) ? localOrders : [])
+      .map((o) => {
+        if (!o || typeof o !== "object") return null
+        const maybe = (o as Record<string, unknown>).display_id
+        return typeof maybe === "number" ? maybe : null
+      })
+      .filter((x): x is number => typeof x === "number"),
+  ].filter((x): x is number => typeof x === "number")
+
+  const nextDisplayId =
+    (existingDisplayIds.length ? Math.max(...existingDisplayIds) : 1000) + 1
+
+  const createdAt = new Date().toISOString()
+  const orderId = createId("order")
+
+  const orderItems = (storeCart.items ?? []).map((item) => {
+    return {
+      id: createId("order_item"),
+      created_at: createdAt,
+      quantity: item.quantity,
+      product_title: item.product_title,
+      product_handle: item.variant?.product?.handle,
+      variant: item.variant,
+    }
+  })
+
+  const order = {
+    id: orderId,
+    display_id: nextDisplayId,
+    created_at: createdAt,
+    currency_code: storeCart.currency_code,
+    subtotal: storeCart.subtotal,
+    total: storeCart.total,
+    tax_total: storeCart.tax_total,
+    shipping_total: storeCart.shipping_total,
+    discount_total: storeCart.discount_total,
+    gift_card_total: storeCart.gift_card_total,
+    items: orderItems,
+    shipping_address: {
+      ...(storeCart.shipping_address ?? {}),
+      country: { display_name: "Vietnam" },
+    },
+    billing_address: {
+      ...(storeCart.billing_address ?? {}),
+      country: { display_name: "Vietnam" },
+    },
+    shipping_methods: storeCart.shipping_methods ?? [],
+    region_id: storeCart.region_id,
+  } as unknown as HttpTypes.StoreOrder
+
+  const nextOrders = Array.isArray(localOrders)
+    ? [...localOrders, order]
+    : [order]
+  await setLocalOrders(JSON.stringify(nextOrders))
+
+  await removeCartId()
+  await removeLocalCart()
+  revalidateTag("cart")
+  revalidateTag("orders")
+
+  return { type: "order", order } as {
+    type: "order"
+    order: HttpTypes.StoreOrder
   }
-
-  const cartId = await getCartId()
-  if (!cartId) {
-    throw new Error("No existing cart found when placing an order")
-  }
-
-  const cartRes = await sdk.store.cart
-    .complete(cartId, {}, await getAuthHeaders())
-    .then((cartRes) => {
-      revalidateTag("cart")
-      revalidateTag("orders")
-      return cartRes
-    })
-    .catch(medusaError)
-
-  if (cartRes?.type === "order") {
-    await removeCartId()
-  }
-
-  return cartRes
 }
 
-/**
- * Updates the countryCode param and revalidate the regions cache
- * @param regionId
- * @param countryCode
- */
 export async function updateRegion(countryCode: string, currentPath: string) {
   if (typeof countryCode !== "string") {
     throw new Error("Invalid country code")
@@ -604,16 +516,18 @@ export async function updateRegion(countryCode: string, currentPath: string) {
     throw new Error("Invalid current path")
   }
 
-  const cartId = await getCartId()
-  const region = await getRegion(countryCode)
+  const existingCartId = await getCartId()
+  void existingCartId
 
+  const region = await getRegion(countryCode)
   if (!region) {
     throw new Error(`Region not found for country code: ${countryCode}`)
   }
 
-  if (cartId) {
-    await updateCart({ region_id: region.id })
-    revalidateTag("cart")
+  const cart = safeJsonParse<LocalCartState>(await getLocalCart())
+  if (cart) {
+    cart.region_id = region.id
+    await saveLocalCart(cart)
   }
 
   revalidateTag("regions")
