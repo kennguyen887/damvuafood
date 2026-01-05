@@ -1,11 +1,11 @@
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
-import { sdk } from "@lib/config"
 import { getRegion, listRegions } from "@lib/data/regions"
 import {
   getProductByHandle,
   getProductFashionDataByHandle,
+  listProductHandles,
 } from "@lib/data/products"
 import ProductTemplate from "@modules/products/templates"
 
@@ -27,16 +27,13 @@ export async function generateStaticParams() {
       return []
     }
 
-    const { products } = await sdk.store.product.list(
-      { fields: "handle" },
-      { next: { tags: ["products"] } }
-    )
+    const handles = await listProductHandles()
 
     const staticParams = countryCodes
       ?.map((countryCode) =>
-        products.map((product) => ({
+        handles.map((handle) => ({
           countryCode,
-          handle: product.handle,
+          handle,
         }))
       )
       .flat()

@@ -78,6 +78,13 @@ cd nextjs-starter-medusa/
 mv .env.template .env.local
 ```
 
+### Data source (Medusa vs JSON)
+
+This project can run without a Medusa backend using fixed JSON data:
+
+- `NEXT_PUBLIC_DATA_SOURCE=json` (default): uses `src/lib/mock/store.json`
+- `NEXT_PUBLIC_DATA_SOURCE=medusa`: requires `NEXT_PUBLIC_MEDUSA_BACKEND_URL` and `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY`
+
 ### Install dependencies
 
 Use Yarn to install all dependencies.

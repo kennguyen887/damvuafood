@@ -2,9 +2,12 @@ import { HttpTypes } from "@medusajs/types"
 import { notFound } from "next/navigation"
 import { NextRequest, NextResponse } from "next/server"
 
+import store from "@lib/mock/store.json"
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL
 const PUBLISHABLE_API_KEY = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
 const DEFAULT_REGION = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
+const DATA_SOURCE = process.env.NEXT_PUBLIC_DATA_SOURCE ?? "json"
 
 const regionMapCache = {
   regionMap: new Map<string, HttpTypes.StoreRegion>(),
@@ -18,17 +21,18 @@ async function getRegionMap() {
     !regionMap.keys().next().value ||
     regionMapUpdated < Date.now() - 3600 * 1000
   ) {
-    console.log({ PUBLISHABLE_API_KEY })
-    // Fetch regions from Medusa. We can't use the JS client here because middleware is running on Edge and the client needs a Node environment.
-    const { regions } = await fetch(`${BACKEND_URL}/store/regions`, {
-      headers: {
-        "x-publishable-api-key": PUBLISHABLE_API_KEY!,
-      },
-      next: {
-        revalidate: 3600,
-        tags: ["regions"],
-      },
-    }).then((res) => res.json())
+    const regions =
+      DATA_SOURCE === "json"
+        ? store.regions
+        : await fetch(`${BACKEND_URL}/store/regions`, {
+            headers: {
+              "x-publishable-api-key": PUBLISHABLE_API_KEY!,
+            },
+            next: {
+              revalidate: 3600,
+              tags: ["regions"],
+            },
+          }).then((res) => res.json().then((b) => b.regions))
 
     if (!regions?.length) {
       notFound()
@@ -80,7 +84,9 @@ async function getCountryCode(
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
       console.error(
-        "Middleware.ts: Error getting the country code. Did you set up regions in your Medusa Admin and define a NEXT_PUBLIC_MEDUSA_BACKEND_URL environment variable?"
+        DATA_SOURCE === "json"
+          ? "Middleware.ts: Error getting the country code in JSON data source mode."
+          : "Middleware.ts: Error getting the country code. Did you set up regions in your Medusa Admin and define a NEXT_PUBLIC_MEDUSA_BACKEND_URL environment variable?"
       )
     }
   }

@@ -1,0 +1,294 @@
+{
+  "regions": [
+    {
+      "id": "region_vn",
+      "name": "Vietnam",
+      "currency_code": "vnd",
+      "countries": [{ "iso_2": "vn", "display_name": "Vietnam" }]
+    }
+  ],
+  "product_types": [
+    {
+      "id": "pt_sofa",
+      "value": "Sofa",
+      "metadata": { "image": { "url": "/images/content/gray-three-seater-sofa.png" } }
+    },
+    {
+      "id": "pt_chair",
+      "value": "Armchair",
+      "metadata": { "image": { "url": "/images/content/gray-arm-chair.png" } }
+    }
+  ],
+  "collections": [
+    {
+      "id": "col_new",
+      "title": "New Arrivals",
+      "handle": "new-arrivals",
+      "metadata": {
+        "image": { "url": "/images/content/white-two-seater-sofa.png" },
+        "description": "Fresh designs for modern homes."
+      }
+    },
+    {
+      "id": "col_best",
+      "title": "Best Sellers",
+      "handle": "best-sellers",
+      "metadata": {
+        "image": { "url": "/images/content/dark-gray-three-seater-sofa.png" },
+        "description": "Customer favorites, always in style."
+      }
+    }
+  ],
+  "product_categories": [
+    {
+      "id": "cat_living",
+      "name": "Living Room",
+      "handle": "living-room",
+      "category_children": []
+    }
+  ],
+  "products": [
+    {
+      "id": "prod_sofa_1",
+      "title": "Gray Three-Seater Sofa",
+      "handle": "gray-three-seater-sofa",
+      "description": "Comfortable three-seater sofa for everyday living.",
+      "thumbnail": "/images/content/gray-three-seater-sofa.png",
+      "images": [{ "id": "img_1", "url": "/images/content/gray-three-seater-sofa.png" }],
+      "collection_id": "col_best",
+      "collection": { "id": "col_best", "title": "Best Sellers", "handle": "best-sellers" },
+      "type": { "id": "pt_sofa", "value": "Sofa" },
+      "variants": [
+        {
+          "id": "variant_sofa_1",
+          "title": "Default",
+          "sku": "SOFA-GRAY-3S",
+          "options": [],
+          "manage_inventory": true,
+          "allow_backorder": false,
+          "inventory_quantity": 20,
+          "calculated_price": {
+            "calculated_amount": 12990000,
+            "original_amount": 14990000,
+            "currency_code": "vnd",
+            "calculated_price": { "price_list_type": "sale" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "prod_armchair_1",
+      "title": "Gray Armchair",
+      "handle": "gray-armchair",
+      "description": "A cozy armchair with a compact footprint.",
+      "thumbnail": "/images/content/gray-arm-chair.png",
+      "images": [{ "id": "img_2", "url": "/images/content/gray-arm-chair.png" }],
+      "collection_id": "col_new",
+      "collection": { "id": "col_new", "title": "New Arrivals", "handle": "new-arrivals" },
+      "type": { "id": "pt_chair", "value": "Armchair" },
+      "variants": [
+        {
+          "id": "variant_armchair_1",
+          "title": "Default",
+          "sku": "CHAIR-GRAY-01",
+          "options": [],
+          "manage_inventory": true,
+          "allow_backorder": false,
+          "inventory_quantity": 35,
+          "calculated_price": {
+            "calculated_amount": 3990000,
+            "original_amount": 3990000,
+            "currency_code": "vnd",
+            "calculated_price": { "price_list_type": "default" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "prod_sofa_2",
+      "title": "Gray Two-Seater Puffy Sofa",
+      "handle": "gray-two-seater-puffy-sofa",
+      "description": "Soft puffy cushions with a compact two-seater profile.",
+      "thumbnail": "/images/content/living-room-gray-two-seater-puffy-sofa.png",
+      "images": [
+        {
+          "id": "img_3",
+          "url": "/images/content/living-room-gray-two-seater-puffy-sofa.png"
+        }
+      ],
+      "collection_id": "col_new",
+      "collection": { "id": "col_new", "title": "New Arrivals", "handle": "new-arrivals" },
+      "type": { "id": "pt_sofa", "value": "Sofa" },
+      "variants": [
+        {
+          "id": "variant_sofa_2",
+          "title": "Default",
+          "sku": "SOFA-GRAY-2S-PUFFY",
+          "options": [],
+          "manage_inventory": true,
+          "allow_backorder": false,
+          "inventory_quantity": 12,
+          "calculated_price": {
+            "calculated_amount": 9990000,
+            "original_amount": 10990000,
+            "currency_code": "vnd",
+            "calculated_price": { "price_list_type": "sale" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "prod_sofa_3",
+      "title": "Dark Gray Three-Seater Sofa",
+      "handle": "dark-gray-three-seater-sofa",
+      "description": "A timeless dark gray sofa designed for modern living rooms.",
+      "thumbnail": "/images/content/dark-gray-three-seater-sofa.png",
+      "images": [{ "id": "img_4", "url": "/images/content/dark-gray-three-seater-sofa.png" }],
+      "collection_id": "col_best",
+      "collection": { "id": "col_best", "title": "Best Sellers", "handle": "best-sellers" },
+      "type": { "id": "pt_sofa", "value": "Sofa" },
+      "variants": [
+        {
+          "id": "variant_sofa_3",
+          "title": "Default",
+          "sku": "SOFA-DKGRAY-3S",
+          "options": [],
+          "manage_inventory": true,
+          "allow_backorder": false,
+          "inventory_quantity": 8,
+          "calculated_price": {
+            "calculated_amount": 13990000,
+            "original_amount": 13990000,
+            "currency_code": "vnd",
+            "calculated_price": { "price_list_type": "default" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "prod_sofa_4",
+      "title": "Dark Green Three-Seater Sofa",
+      "handle": "dark-green-three-seater-sofa",
+      "description": "Deep green tone with comfortable seating for three.",
+      "thumbnail": "/images/content/living-room-dark-green-three-seater-sofa.png",
+      "images": [
+        {
+          "id": "img_5",
+          "url": "/images/content/living-room-dark-green-three-seater-sofa.png"
+        }
+      ],
+      "collection_id": "col_new",
+      "collection": { "id": "col_new", "title": "New Arrivals", "handle": "new-arrivals" },
+      "type": { "id": "pt_sofa", "value": "Sofa" },
+      "variants": [
+        {
+          "id": "variant_sofa_4",
+          "title": "Default",
+          "sku": "SOFA-DKGREEN-3S",
+          "options": [],
+          "manage_inventory": true,
+          "allow_backorder": false,
+          "inventory_quantity": 6,
+          "calculated_price": {
+            "calculated_amount": 15990000,
+            "original_amount": 17990000,
+            "currency_code": "vnd",
+            "calculated_price": { "price_list_type": "sale" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "prod_sofa_5",
+      "title": "Gray One-Seater Sofa",
+      "handle": "gray-one-seater-sofa",
+      "description": "A single-seater that fits small spaces without compromising comfort.",
+      "thumbnail": "/images/content/gray-one-seater-sofa-wooden-coffee-table.png",
+      "images": [
+        {
+          "id": "img_6",
+          "url": "/images/content/gray-one-seater-sofa-wooden-coffee-table.png"
+        }
+      ],
+      "collection_id": "col_best",
+      "collection": { "id": "col_best", "title": "Best Sellers", "handle": "best-sellers" },
+      "type": { "id": "pt_sofa", "value": "Sofa" },
+      "variants": [
+        {
+          "id": "variant_sofa_5",
+          "title": "Default",
+          "sku": "SOFA-GRAY-1S",
+          "options": [],
+          "manage_inventory": true,
+          "allow_backorder": false,
+          "inventory_quantity": 18,
+          "calculated_price": {
+            "calculated_amount": 5490000,
+            "original_amount": 5990000,
+            "currency_code": "vnd",
+            "calculated_price": { "price_list_type": "sale" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "prod_sofa_6",
+      "title": "Gray Backrest Sofa",
+      "handle": "gray-backrest-sofa",
+      "description": "Supportive backrest design for long, relaxed seating.",
+      "thumbnail": "/images/content/gray-backrest-sofa-wooden-coffee-table.png",
+      "images": [
+        {
+          "id": "img_7",
+          "url": "/images/content/gray-backrest-sofa-wooden-coffee-table.png"
+        }
+      ],
+      "collection_id": "col_new",
+      "collection": { "id": "col_new", "title": "New Arrivals", "handle": "new-arrivals" },
+      "type": { "id": "pt_sofa", "value": "Sofa" },
+      "variants": [
+        {
+          "id": "variant_sofa_6",
+          "title": "Default",
+          "sku": "SOFA-GRAY-BACKREST",
+          "options": [],
+          "manage_inventory": true,
+          "allow_backorder": false,
+          "inventory_quantity": 10,
+          "calculated_price": {
+            "calculated_amount": 11990000,
+            "original_amount": 11990000,
+            "currency_code": "vnd",
+            "calculated_price": { "price_list_type": "default" }
+          }
+        }
+      ]
+    }
+  ],
+  "fashion": {
+    "gray-three-seater-sofa": { "materials": [] },
+    "gray-armchair": { "materials": [] },
+    "gray-two-seater-puffy-sofa": { "materials": [] },
+    "dark-gray-three-seater-sofa": { "materials": [] },
+    "dark-green-three-seater-sofa": { "materials": [] },
+    "gray-one-seater-sofa": { "materials": [] },
+    "gray-backrest-sofa": { "materials": [] }
+  },
+  "orders": [
+    {
+      "id": "order_demo_1",
+      "display_id": 1001,
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "fulfillment_status": "shipped",
+      "items": [
+        {
+          "id": "item_demo_1",
+          "title": "Gray Three-Seater Sofa",
+          "quantity": 1,
+          "thumbnail": "/images/content/gray-three-seater-sofa.png",
+          "product_handle": "gray-three-seater-sofa"
+        }
+      ]
+    }
+  ]
+}

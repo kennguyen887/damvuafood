@@ -4,6 +4,16 @@ import { getRegion } from "@lib/data/regions"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 import { sortProducts } from "@lib/util/sort-products"
 
+export const listProductHandles = async function () {
+  return sdk.client
+    .fetch<{ products: { handle: string }[] }>(`/store/products`, {
+      query: { limit: 1000, fields: "handle" },
+      next: { tags: ["products"] },
+      cache: "force-cache",
+    })
+    .then(({ products }) => products.map((p) => p.handle).filter(Boolean))
+}
+
 export const getProductsById = async function ({
   ids,
   regionId,

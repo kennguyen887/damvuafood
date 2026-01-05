@@ -1,6 +1,19 @@
 const c = require("ansi-colors")
 
-const requiredEnvs = [
+const commonRequiredEnvs = [
+  {
+    key: "NEXT_PUBLIC_BASE_URL",
+    description:
+      "Your store URL, should be updated to where you are hosting your storefront.",
+  },
+  {
+    key: "NEXT_PUBLIC_DEFAULT_REGION",
+    description:
+      'Your preferred default region. When middleware cannot determine the user region from the "x-vercel-country" header, the default region will be used. ISO-2 lowercase format.',
+  },
+]
+
+const medusaRequiredEnvs = [
   {
     key: "NEXT_PUBLIC_MEDUSA_BACKEND_URL",
     description:
@@ -12,16 +25,6 @@ const requiredEnvs = [
       "Your publishable key that can be attached to sales channels. See - https://docs.medusajs.com/development/publishable-api-keys.",
   },
   {
-    key: "NEXT_PUBLIC_BASE_URL",
-    description:
-      "Your store URL, should be updated to where you are hosting your storefront.",
-  },
-  {
-    key: "NEXT_PUBLIC_DEFAULT_REGION",
-    description:
-      'Your preferred default region. When middleware cannot determine the user region from the "x-vercel-country" header, the default region will be used. ISO-2 lowercase format.',
-  },
-  {
     key: "NEXT_PUBLIC_STRIPE_KEY",
     description:
       "Your Stripe public key. See - https://docs.medusajs.com/add-plugins/stripe.",
@@ -29,6 +32,15 @@ const requiredEnvs = [
 ]
 
 function checkEnvVariables() {
+  const dataSource = process.env.NEXT_PUBLIC_DATA_SOURCE || "json"
+
+  if (dataSource === "json") {
+    return
+  }
+
+  const requiredEnvs =
+    commonRequiredEnvs.concat(medusaRequiredEnvs)
+
   const missingEnvs = requiredEnvs.filter(function (env) {
     return !process.env[env.key]
   })

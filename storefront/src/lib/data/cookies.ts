@@ -45,3 +45,22 @@ export const setCartId = async (cartId: string) => {
 export const removeCartId = async () => {
   return (await cookies()).set("_medusa_cart_id", "", { maxAge: -1 })
 }
+
+const LOCAL_CART_COOKIE = "_local_cart"
+
+export const getLocalCart = async () => {
+  return (await cookies()).get(LOCAL_CART_COOKIE)?.value
+}
+
+export const setLocalCart = async (value: string) => {
+  return (await cookies()).set(LOCAL_CART_COOKIE, value, {
+    maxAge: 60 * 60 * 24 * 7,
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+  })
+}
+
+export const removeLocalCart = async () => {
+  return (await cookies()).set(LOCAL_CART_COOKIE, "", { maxAge: -1 })
+}
